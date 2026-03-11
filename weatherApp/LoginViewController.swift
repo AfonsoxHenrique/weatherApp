@@ -1,29 +1,33 @@
-//
-//  LoginViewController.swift
-//  weatherApp
-//
-//  Created by Afonso Henrique Freitas de Paula on 11/3/2026.
-//
 
 import UIKit
 
 class LoginViewController: UIViewController {
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
-
-        // Do any additional setup after loading the view.
+    @IBOutlet weak var emailField: UITextField!
+    @IBOutlet weak var passwordField: UITextField!
+    
+    @IBAction func loginTapped(_ sender: UIButton) {
+        
+        let storyboard = UIStoryboard(name: "Main", bundle: nil)
+        let tabBar = storyboard.instantiateViewController(withIdentifier: "MainTabBar")
+        tabBar.modalPresentationStyle = .fullScreen
+        present(tabBar, animated: true)
+        
+        if emailField.text == "test@test.com" &&
+           passwordField.text == "123456" {
+            
+            performSegue(withIdentifier: "goToWeather", sender: self)
+            
+        } else {
+            showError()
+        }
     }
     
-
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destination.
-        // Pass the selected object to the new view controller.
+    func showError() {
+        let alert = UIAlertController(title: "Error",
+                                      message: "Invalid login",
+                                      preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
-    */
-
 }
