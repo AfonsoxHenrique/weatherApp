@@ -17,14 +17,12 @@ class AddCityViewController: UIViewController, UITableViewDelegate, UITableViewD
         
         loadCities()
         
-        // ✅ Listen for unit changes
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(refreshUnits),
                                                name: NSNotification.Name("unitsChanged"),
                                                object: nil)
     }
     
-    // ✅ Refresh temperatures when unit changes
     @objc func refreshUnits() {
         tableView.reloadData()
     }
@@ -81,7 +79,6 @@ class AddCityViewController: UIViewController, UITableViewDelegate, UITableViewD
                 
                 DispatchQueue.main.async {
                     
-                    // ✅ Use global temperature setting
                     cell.weatherLabel.text = "\(SettingsManager.formatTemperature(decoded.main.temp)) - \(desc.capitalized)"
                     
                     if let url = URL(string: iconURL) {
