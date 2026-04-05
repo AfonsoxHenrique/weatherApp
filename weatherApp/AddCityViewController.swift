@@ -7,6 +7,7 @@ class AddCityViewController: UIViewController, UITableViewDelegate, UITableViewD
     
     let db = Firestore.firestore()
     var cities: [City] = []
+    var selectedCity: City?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -46,13 +47,26 @@ class AddCityViewController: UIViewController, UITableViewDelegate, UITableViewD
         cell.cityNameLabel.text = city.name
         cell.weatherLabel.text = "Loading..."
         
-        // Delete button
         cell.deleteButton.tag = indexPath.row
         cell.deleteButton.addTarget(self, action: #selector(deleteCityButtonTapped(_:)), for: .touchUpInside)
         
         fetchWeather(for: city, cell: cell)
         
         return cell
+    }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        selectedCity = cities[indexPath.row]
+        performSegue(withIdentifier: "showCityDetails", sender: self)
+    }
+    
+    // MARK: - Segue to Detailed View
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "showCityDetails" {
+            if let destination = segue.destination as? SavedCityDetailViewController {
+                destination.selectedCity = selectedCity
+            }
+        }
     }
     
     // MARK: - Fetch weather
@@ -78,7 +92,6 @@ class AddCityViewController: UIViewController, UITableViewDelegate, UITableViewD
                 let iconURL = "https://openweathermap.org/img/wn/\(iconCode)@2x.png"
                 
                 DispatchQueue.main.async {
-                    
                     cell.weatherLabel.text = "\(SettingsManager.formatTemperature(decoded.main.temp)) - \(desc.capitalized)"
                     
                     if let url = URL(string: iconURL) {
@@ -208,3 +221,4 @@ class AddCityViewController: UIViewController, UITableViewDelegate, UITableViewD
         }.resume()
     }
 }
+
