@@ -8,7 +8,8 @@ class SettingsViewController: UIViewController, UITableViewDelegate, UITableView
         "Units",
         "Notifications",
         "Appearance",
-        "About"
+        "About",
+        "Profile"
     ]
 
     override func viewDidLoad() {
@@ -35,11 +36,40 @@ class SettingsViewController: UIViewController, UITableViewDelegate, UITableView
     }
 
     // MARK: - TableView
-    
+        
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return settingsOptions.count
     }
 
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+            print("Tapped row:", indexPath.row)
+            tableView.deselectRow(at: indexPath, animated: true)
+
+            switch indexPath.row {
+            case 1:
+                print("Notifications tapped")
+
+            case 3:
+                print("About tapped")
+
+            case 4:
+                print("Profile tapped")
+
+                let storyboard = UIStoryboard(name: "Main", bundle: nil)
+                let profileVC = storyboard.instantiateViewController(withIdentifier: "ProfileViewController")
+
+                if let nav = navigationController {
+                    nav.pushViewController(profileVC, animated: true)
+                } else {
+                    profileVC.modalPresentationStyle = .fullScreen
+                    present(profileVC, animated: true)
+                }
+
+            default:
+                break
+            }
+        }
+    
     func tableView(_ tableView: UITableView,
                    cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
@@ -64,10 +94,8 @@ class SettingsViewController: UIViewController, UITableViewDelegate, UITableView
         }
         
         // NORMAL CELLS
-        else {
-            cell.accessoryType = .disclosureIndicator
+        else { cell.accessoryType = .disclosureIndicator
         }
-        
         return cell
     }
 
@@ -78,11 +106,11 @@ class SettingsViewController: UIViewController, UITableViewDelegate, UITableView
         NotificationCenter.default.post(name: NSNotification.Name("unitsChanged"), object: nil)
     }
     
-    // MARK: - Appearance
+// MARK: - Appearance
     
     @objc func appearanceChanged(_ sender: UISegmentedControl) {
         SettingsManager.appearance = sender.selectedSegmentIndex
         applyAppearance()
     }
-    
+
 }

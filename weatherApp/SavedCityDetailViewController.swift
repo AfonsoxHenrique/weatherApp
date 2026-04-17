@@ -13,6 +13,8 @@ class SavedCityDetailViewController: UIViewController, UITableViewDelegate, UITa
     var hourlyForecast: [ForecastItem] = []
     var dailyForecast: [ForecastItem] = []
 
+    private var chartHostingController: UIHostingController<ForecastChartView>?
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -34,7 +36,11 @@ class SavedCityDetailViewController: UIViewController, UITableViewDelegate, UITa
     // MARK: - TableView
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        segmentedControl.selectedSegmentIndex == 0 ? dailyForecast.count : hourlyForecast.count
+        if segmentedControl.selectedSegmentIndex == 0 {
+            return hourlyForecast.count
+        } else {
+            return dailyForecast.count
+        }
     }
 
     func tableView(_ tableView: UITableView,
@@ -45,11 +51,13 @@ class SavedCityDetailViewController: UIViewController, UITableViewDelegate, UITa
         let forecast: ForecastItem
 
         if segmentedControl.selectedSegmentIndex == 0 {
-            forecast = dailyForecast[indexPath.row]
-            cell.dateLabel.text = formatDay(forecast.dt_txt)
-        } else {
+            guard indexPath.row < hourlyForecast.count else { return cell }
             forecast = hourlyForecast[indexPath.row]
             cell.dateLabel.text = formatHour(forecast.dt_txt)
+        } else {
+            guard indexPath.row < dailyForecast.count else { return cell }
+            forecast = dailyForecast[indexPath.row]
+            cell.dateLabel.text = formatDay(forecast.dt_txt)
         }
 
         let desc = forecast.weather.first?.description ?? ""
@@ -58,6 +66,7 @@ class SavedCityDetailViewController: UIViewController, UITableViewDelegate, UITa
         cell.tempLabel.text = SettingsManager.formatTemperature(forecast.main.temp)
         cell.descLabel.text = desc.capitalized
         cell.selectionStyle = .none
+        cell.iconImageView.image = nil
 
         let iconURL = "https://openweathermap.org/img/wn/\(iconCode)@2x.png"
 
@@ -65,7 +74,9 @@ class SavedCityDetailViewController: UIViewController, UITableViewDelegate, UITa
             URLSession.shared.dataTask(with: url) { data, _, _ in
                 guard let data = data else { return }
                 DispatchQueue.main.async {
-                    cell.iconImageView.image = UIImage(data: data)
+                    if let updatedCell = tableView.cellForRow(at: indexPath) as? ForecastTableViewCell {
+                        updatedCell.iconImageView.image = UIImage(data: data)
+                    }
                 }
             }.resume()
         }
@@ -73,117 +84,135 @@ class SavedCityDetailViewController: UIViewController, UITableViewDelegate, UITa
         return cell
     }
 
-    // MARK: - Forecast
+// MARK: - Forecast
 
-    func fetchForecast(lat: Double, lon: Double) {
-        let apiKey = "8011da736900b241b6c870400cbf23d3"
-        let urlString = "https://api.openweathermap.org/data/2.5/forecast?lat=\(lat)&lon=\(lon)&appid=\(apiKey)&units=metric"
+func fetchForecast(lat: Double, lon: Double) {
+    let apiKey = "8011da736900b241b6c870400cbf23d3"
+    let urlString = "https://api.openweathermap.org/data/2.5/forecast?lat=\(lat)&lon=\(lon)&appid=\(apiKey)&units=metric"
 
-        guard let url = URL(string: urlString) else { return }
+    guard let url = URL(string: urlString) else { return }
 
-        URLSession.shared.dataTask(with: url) { data, _, error in
-            if let error = error {
-                print("Forecast error:", error)
-                return
-            }
+    URLSession.shared.dataTask(with: url) { data, _, error in
+        if let error = error {
+            print("Forecast error:", error)
+            return
+        }
 
-            guard let data = data else { return }
+        guard let data = data else { return }
 
-            do {
-                let decoded = try JSONDecoder().decode(ForecastResponse.self, from: data)
+    do {
+        let decoded = try JSONDecoder().decode(ForecastResponse.self, from: data)
 
-                DispatchQueue.main.async {
-                    self.hourlyForecast = Array(decoded.list.prefix(12))
-                    self.dailyForecast = stride(from: 0, to: decoded.list.count, by: 8).map {
-                        decoded.list[$0]
-                    }
+        DispatchQueue.main.async {
+            let allForecasts = decoded.list
 
-                    self.tableView.reloadData()
-                    self.updateChart()
+            self.hourlyForecast = Array(allForecasts.prefix(8))
+
+            var groupedDaily: [ForecastItem] = []
+            var usedDays: Set<String> = []
+
+            for item in allForecasts {
+                let dayKey = String(item.dt_txt.prefix(10))
+                if !usedDays.contains(dayKey) {
+                    groupedDaily.append(item)
+                    usedDays.insert(dayKey)
                 }
-
-            } catch {
-                print("Forecast decoding error:", error)
             }
-        }.resume()
+
+            self.dailyForecast = groupedDaily
+
+            print("Hourly times:")
+            self.hourlyForecast.forEach { print($0.dt_txt, $0.main.temp) }
+
+            self.tableView.reloadData()
+            self.updateChart()
+        }
+    } catch {
+        print("Forecast decoding error:", error)
     }
+    }.resume()
+}
 
     // MARK: - Chart
 
-    func updateChart() {
-        let points: [ForecastChartPoint]
+func updateChart() {
+    let points: [ForecastChartPoint]
 
-        if segmentedControl.selectedSegmentIndex == 0 {
-            points = dailyForecast.map {
-                ForecastChartPoint(
-                    label: formatShortDay($0.dt_txt),
-                    temperature: $0.main.temp
-                )
-            }
-        } else {
-            points = hourlyForecast.map {
-                ForecastChartPoint(
-                    label: formatHour($0.dt_txt),
-                    temperature: $0.main.temp
-                )
-            }
+    if segmentedControl.selectedSegmentIndex == 0 {
+        points = hourlyForecast.map {
+            ForecastChartPoint(
+                label: formatHour($0.dt_txt),
+                temperature: $0.main.temp
+            )
         }
-
-        let chartView = ForecastChartView(points: points)
-        let hostingController = UIHostingController(rootView: chartView)
-
-        addChild(hostingController)
-        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
-        hostingController.view.backgroundColor = .clear
-
-        chartContainerView.subviews.forEach { $0.removeFromSuperview() }
-        chartContainerView.addSubview(hostingController.view)
-
-        NSLayoutConstraint.activate([
-            hostingController.view.topAnchor.constraint(equalTo: chartContainerView.topAnchor),
-            hostingController.view.bottomAnchor.constraint(equalTo: chartContainerView.bottomAnchor),
-            hostingController.view.leadingAnchor.constraint(equalTo: chartContainerView.leadingAnchor),
-            hostingController.view.trailingAnchor.constraint(equalTo: chartContainerView.trailingAnchor)
-        ])
-
-        hostingController.didMove(toParent: self)
+    } else {
+        points = dailyForecast.map {
+            ForecastChartPoint(
+                label: formatShortDay($0.dt_txt),
+                temperature: $0.main.temp
+            )
+        }
     }
 
-    // MARK: - Formatters
+    chartHostingController?.willMove(toParent: nil)
+    chartHostingController?.view.removeFromSuperview()
+    chartHostingController?.removeFromParent()
 
-    func formatDay(_ dateString: String) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    let hostingController = UIHostingController(rootView: ForecastChartView(points: points))
+    chartHostingController = hostingController
 
-        if let date = formatter.date(from: dateString) {
-            formatter.dateFormat = "EEEE"
-            return formatter.string(from: date).uppercased()
-        }
+    addChild(hostingController)
+    hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+    hostingController.view.backgroundColor = .clear
 
-        return dateString
+    chartContainerView.addSubview(hostingController.view)
+
+    NSLayoutConstraint.activate([
+        hostingController.view.topAnchor.constraint(equalTo: chartContainerView.topAnchor),
+        hostingController.view.bottomAnchor.constraint(equalTo: chartContainerView.bottomAnchor),
+        hostingController.view.leadingAnchor.constraint(equalTo: chartContainerView.leadingAnchor),
+        hostingController.view.trailingAnchor.constraint(equalTo: chartContainerView.trailingAnchor)
+    ])
+
+    hostingController.didMove(toParent: self)
+}
+
+// MARK: - Formatters
+
+func formatDay(_ dateString: String) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+
+    if let date = formatter.date(from: dateString) {
+        formatter.dateFormat = "EEEE"
+        return formatter.string(from: date)
     }
 
-    func formatShortDay(_ dateString: String) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    return dateString
+}
 
-        if let date = formatter.date(from: dateString) {
-            formatter.dateFormat = "EEE"
-            return formatter.string(from: date)
-        }
+func formatShortDay(_ dateString: String) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
 
-        return dateString
+    if let date = formatter.date(from: dateString) {
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date)
     }
 
-    func formatHour(_ dateString: String) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    return dateString
+}
 
-        if let date = formatter.date(from: dateString) {
-            formatter.dateFormat = "ha"
-            return formatter.string(from: date)
-        }
+func formatHour(_ dateString: String) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
 
-        return dateString
+    if let date = formatter.date(from: dateString) {
+        formatter.dateFormat = "h a"
+        return formatter.string(from: date)
     }
+
+    return dateString
+}
 }
