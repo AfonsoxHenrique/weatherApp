@@ -113,7 +113,7 @@ class ProfileViewController: UIViewController {
                 if let error = error {
                     self.showAlert(
                         title: "Delete Error",
-                        message: error.localizedDescription + "\nYou may need to log in again before deleting."
+                        message: error.localizedDescription + "\nYou need to log in again before deleting."
                     )
                 } else {
                     let storyboard = UIStoryboard(name: "Main", bundle: nil)
